@@ -378,9 +378,22 @@ async function startRec(){
   mediaRec.onstop = () => { stream.getTracks().forEach(t=>t.stop()); myBlob = new Blob(chunks,{type: mediaRec.mimeType||'audio/webm'}); if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(myBlob); $('playme').disabled=false; };
   mediaRec.start();
   if(SR){
-    recog = new SR(); recog.lang='it-IT'; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=true;
-    recog.onresult = e => { let t=''; for(let i=0;i<e.results.length;i++){ t += e.results[i][0].transcript+' '; } lastTranscript = t.trim(); };
-    recog.onerror = e => { if(e.error!=='no-speech' && e.error!=='aborted') $('note').textContent='Speech recognition error: '+e.error; };
+    recog = new SR(); recog.lang='it-IT'; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=false;
+    let finalText = '';
+    recog.onresult = e => { let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) finalText += e.results[i][0].transcript+' '; else interim += e.results[i][0].transcript; } lastTranscript = (finalText+interim).trim(); };
+    recog.onerror = e => {
+      if(e.error==='no-speech' || e.error==='aborted') return;
+      $('note').className='note warn';
+      if(e.error==='network'){
+        recog = null;
+        $('note').textContent="This browser can't reach a speech-to-text service, so there is no score (Brave, Edge, Vivaldi and offline Chrome all do this). Your recording is still saved for Play me. For scoring use Google Chrome on Android or a computer, or Safari on iPhone and Mac.";
+      } else if(e.error==='not-allowed' || e.error==='service-not-allowed'){
+        recog = null;
+        $('note').textContent='Microphone access for speech recognition was refused. Allow the microphone for this site in the browser settings, then reload.';
+      } else {
+        $('note').textContent='Speech recognition error: '+e.error;
+      }
+    };
     recog.onend = () => { if(recording){ try{recog.start();}catch(e){} } else { scoreIt(); } };
     try{ recog.start(); }catch(e){}
   } else {
@@ -391,7 +404,7 @@ async function startRec(){
 function stopRec(){
   recording=false; $('rec').dataset.on='false'; $('rec').textContent='● Record';
   if(mediaRec && mediaRec.state!=='inactive') mediaRec.stop();
-  if(recog){ try{ recog.stop(); }catch(e){} } else { $('note').textContent='Saved. Play it back against the model.'; }
+  if(recog){ try{ recog.stop(); }catch(e){} } else if(!$('note').classList.contains('warn')){ $('note').textContent='Saved. Play it back against the model.'; }
 }
 let micBlocked = false;
 function noMic(){
