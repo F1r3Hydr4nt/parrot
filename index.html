@@ -1,0 +1,471 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Pappagallo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working card centred like an index card on a bar counter; filters above, progress strip below. */
+:root{
+  --bg:#F2F4EE; --surface:#FFFFFF; --fg:#1E2321; --muted:#67706C; --line:#D5DAD2;
+  --accent:#B5342E; --accent-ink:#FFFFFF; --you:#2A6F6F; --you-soft:#DCEDEB; --accent-soft:#F5DEDB;
+  --good:#2E7D4F; --warn:#B7791F; --bad:#B5342E;
+  --display:"Bricolage Grotesque","Avenir Next","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#15191A; --surface:#1E2425; --fg:#E9ECE6; --muted:#9AA39E; --line:#2F3738;
+  --accent:#E0574F; --accent-ink:#1A0B0A; --you:#4FB0A8; --you-soft:#1C3435; --accent-soft:#3A1F1E;
+  --good:#5FBF84; --warn:#D9A441; --bad:#E0574F; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#15191A; --surface:#1E2425; --fg:#E9ECE6; --muted:#9AA39E; --line:#2F3738;
+  --accent:#E0574F; --accent-ink:#1A0B0A; --you:#4FB0A8; --you-soft:#1C3435; --accent-soft:#3A1F1E;
+  --good:#5FBF84; --warn:#D9A441; --bad:#E0574F; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:20px 48px;font-variant-numeric:tabular-nums}
+.wrap{max-width:720px;margin:0 auto;display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+.wrap > *{min-width:0}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,6vw,40px);letter-spacing:-.02em;margin:0;line-height:1}
+h1 small{display:block;font-family:var(--body);font-weight:500;font-size:13px;color:var(--muted);letter-spacing:.02em;margin-top:6px}
+.stat{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
+.stat b{color:var(--fg);font-weight:500}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.weeks{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1 1 100%;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.weeks::-webkit-scrollbar{display:none}
+.weeks .chip{flex:0 0 auto}
+@media (min-width:600px){.weeks{flex:0 1 auto;overflow:visible}}
+.chip{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:6px 12px;font:500 13px var(--body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip:focus-visible,button:focus-visible{outline:2px solid var(--you);outline-offset:2px}
+.spacer{flex:1}
+.ghost{border:1px dashed var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:6px 12px;font:500 13px var(--body);cursor:pointer}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:grid;gap:16px;min-width:0}
+.meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.meta .tag{border-left:3px solid var(--accent);padding-left:8px;color:var(--fg)}
+.sentence{font-family:var(--display);font-weight:700;font-size:clamp(24px,5.2vw,36px);line-height:1.18;letter-spacing:-.01em;text-wrap:balance;margin:0}
+.hint{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.hint b{color:var(--accent);font-weight:500}
+.en{font-size:15px;color:var(--muted);font-style:italic}
+.en[hidden]{display:none}
+
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.controls .big{justify-content:center;padding-inline:6px;white-space:nowrap;min-width:0;font-size:14px}
+.subrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.subrow .speed{flex:1 1 180px}
+.subrow .speed input{flex:1;width:auto;min-width:80px}
+@media (min-width:600px){.controls{display:flex;flex-wrap:wrap}.controls .big{padding-inline:18px}.subrow{justify-content:flex-start}.subrow .speed{flex:0 0 auto}.subrow .speed input{width:110px;flex:none}}
+button.big{border:0;border-radius:10px;padding:12px 18px;font:600 15px var(--body);cursor:pointer;display:inline-flex;gap:8px;align-items:center;min-height:44px}
+.listen{background:var(--fg);color:var(--bg)}
+.rec{background:var(--accent);color:var(--accent-ink)}
+.rec[data-on="true"]{background:var(--bad);animation:pulse 1.2s infinite}
+.me{background:var(--you-soft);color:var(--you)}
+button:disabled{opacity:.45;cursor:not-allowed}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(181,52,46,.45)}50%{box-shadow:0 0 0 10px rgba(181,52,46,0)}}
+@media (prefers-reduced-motion:reduce){.rec[data-on="true"]{animation:none}}
+.speed{display:inline-flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.speed input{width:110px;accent-color:var(--you)}
+
+.score{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center;border-top:1px solid var(--line);padding-top:14px}
+.score .num{font-family:var(--display);font-weight:800;font-size:44px;line-height:1;letter-spacing:-.02em}
+.score .num.good{color:var(--good)} .score .num.warn{color:var(--warn)} .score .num.bad{color:var(--bad)}
+.score .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.heard{font-family:var(--mono);font-size:14px;grid-column:1/-1;min-width:0;overflow-wrap:anywhere}
+.heard .w{padding:1px 4px;border-radius:4px;margin-right:2px;display:inline-block}
+.heard .ok{background:transparent} .heard .miss{background:var(--accent-soft);color:var(--bad);text-decoration:line-through}
+.heard .near{background:var(--you-soft);color:var(--you)}
+.note{font-size:13px;color:var(--muted)}
+.note.warn{color:var(--warn)}
+#fallback .big{flex:1 1 100%;justify-content:center;text-align:center}
+@media (min-width:600px){#fallback .big{flex:0 0 auto}}
+
+nav{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+nav > button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:10px;padding:10px 16px;font:500 14px var(--body);cursor:pointer;min-height:44px;white-space:nowrap}
+.dots{grid-column:1/-1;grid-row:1;display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0}
+.dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--line);border:0;padding:0;cursor:pointer}
+.dot.cur{outline:2px solid var(--fg);outline-offset:1px}
+.dot.good{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+@media (min-width:600px){nav{grid-template-columns:auto 1fr auto}.dots{grid-column:2;grid-row:1}nav #next{grid-column:3}}
+.foot{font-size:12px;color:var(--muted);text-align:center}
+@media (hover:none),(max-width:599px){.foot{display:none}}
+kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+
+.overlay{position:fixed;inset:0;background:rgba(20,24,22,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:env(safe-area-inset-bottom,0px)}
+.overlay[hidden]{display:none}
+@media (min-width:600px){.overlay{align-items:center}}
+.dialog{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:14px 14px 0 0;padding:22px;max-width:520px;width:100%;display:grid;gap:12px;max-height:88vh;overflow:auto;min-width:0}
+@media (min-width:600px){.dialog{border-radius:14px}}
+.dialog h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0;line-height:1.15;text-wrap:balance}
+.dialog ol{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pappagallo<small>Listen. Repeat. Get scored. Sixty-odd sentences nobody would put in a textbook.</small></h1>
+    <div class="stat" id="stat"></div>
+  </header>
+
+  <div class="filters" id="filters" role="group" aria-label="Filter sentences"></div>
+
+  <section class="card" aria-live="polite">
+    <div class="meta"><span class="tag" id="focus"></span><span id="week"></span><span id="pos"></span></div>
+    <p class="sentence" id="it"></p>
+    <div class="hint" id="hint"></div>
+    <p class="en" id="en"></p>
+
+    <div class="controls">
+      <button class="big listen" id="listen">▶ Listen</button>
+      <button class="big rec" id="rec" data-on="false">● Record</button>
+      <button class="big me" id="playme" disabled>▶ Play me</button>
+    </div>
+    <div class="subrow">
+      <label class="speed">Speed <input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="0.85"><span id="rateval">0.85×</span></label>
+      <button class="chip" id="toggle-en" aria-pressed="true">English</button>
+    </div>
+
+    <div class="score" id="score" hidden>
+      <div class="num" id="num">—</div>
+      <div><div class="lbl">Best <span id="best">—</span> · attempts <span id="tries">0</span></div><div class="note" id="verdict"></div></div>
+      <div class="heard" id="heard"></div>
+    </div>
+    <div class="note" id="note"></div>
+    <div class="row" id="fallback" hidden>
+      <button class="big listen" id="getfull">Save the full version</button>
+      <label class="big me" for="upload" style="cursor:pointer">⏺ Record with my phone's recorder</label>
+      <input type="file" id="upload" accept="audio/*" capture hidden>
+      <span class="note">The full version records and scores in Chrome. The recorder option plays your take against the model, without a score.</span>
+    </div>
+  </section>
+
+  <nav>
+    <button id="prev">← Prev</button>
+    <div class="dots" id="dots" aria-label="Progress"></div>
+    <button id="next">Next →</button>
+  </nav>
+  <p class="foot"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>L</kbd> listen · <kbd>R</kbd> record/stop · <kbd>M</kbd> play me · <kbd>E</kbd> English</p>
+</div>
+
+<div class="overlay" id="voice-guide" hidden role="dialog" aria-modal="true" aria-labelledby="vg-title">
+  <div class="dialog">
+    <h2 id="vg-title">Add an Italian voice to <span id="vg-os"></span></h2>
+    <p class="note">The page reads sentences with your device's own voices, and this one has no Italian voice yet. It takes a minute to add and is free.</p>
+    <ol id="vg-steps"></ol>
+    <p class="note" id="vg-found"></p>
+    <div class="row">
+      <button class="big listen" id="vg-check">Check again</button>
+      <button class="chip" id="vg-anyway">Play with the default voice</button>
+      <button class="chip" id="vg-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Sentences: it = Italian, en = English, w = week, f = grammar focus, h = stress/pronunciation hint (uppercase = stressed syllable)
+const DECK = [
+ {it:"Il gatto parla francese, ma solo il lunedì.",en:"The cat speaks French, but only on Mondays.",w:1,f:"present tense",h:"PARla · lu-ne-DÌ"},
+ {it:"Mangio la pizza con le mani, come un re.",en:"I eat pizza with my hands, like a king.",w:1,f:"present tense",h:"MAN-gio · final vowels loud"},
+ {it:"I nonni ballano in cucina alle tre di notte.",en:"The grandparents dance in the kitchen at three in the morning.",w:1,f:"loro stress",h:"BALlano, not balLAno · hold the nn"},
+ {it:"Lo zio dorme sul tavolo e russa come un trattore.",en:"Uncle sleeps on the table and snores like a tractor.",w:1,f:"articles & contractions",h:"lo ZIo (ts) · sul = su + il · hold the ss, tt"},
+ {it:"Capisco tutto, tranne le parole.",en:"I understand everything, except the words.",w:1,f:"-isc- verbs",h:"ca-PI-sco · hold the tt"},
+ {it:"Il mio cane non capisce il sarcasmo.",en:"My dog doesn't understand sarcasm.",w:1,f:"-isc- verbs",h:"ca-PI-sce (sh) · c in cane is k"},
+ {it:"Vorrei un caffè grande come la mia stanchezza.",en:"I'd like a coffee as big as my tiredness.",w:1,f:"vorrei",h:"vor-REI · caf-FÈ · stan-KEZ-za"},
+ {it:"Gli studenti arrivano sempre in ritardo, ma con stile.",en:"The students always arrive late, but with style.",w:1,f:"loro stress",h:"gli = ly · ar-RI-vano"},
+ {it:"Non ho tempo, ho solo pasta.",en:"I don't have time, I only have pasta.",w:1,f:"avere",h:"ho = o, the h is silent"},
+ {it:"Siamo tutti stanchi, ma la pasta non si cucina da sola.",en:"We're all tired, but the pasta doesn't cook itself.",w:1,f:"noi -iamo",h:"SIA-mo · cu-CI-na (ch)"},
+ {it:"Mia nonna guida una Vespa più veloce di un Ferrari.",en:"My grandmother rides a Vespa faster than a Ferrari.",w:1,f:"present tense",h:"GUI-da · ve-LO-che"},
+ {it:"Il bagno è in fondo a destra, dopo il pappagallo.",en:"The bathroom is at the end on the right, after the parrot.",w:1,f:"errands",h:"BA-gno (ny) · pap-pa-GAL-lo"},
+ {it:"Quanto costa? Più del mio stipendio?",en:"How much is it? More than my salary?",w:1,f:"errands",h:"QUAN-to · del = di + il"},
+ {it:"Posso pagare con la carta o con un sorriso?",en:"Can I pay by card or with a smile?",w:1,f:"errands",h:"POS-so · sor-RI-so (hold rr)"},
+ {it:"Scusi, dov'è la fermata? Sono perso da martedì.",en:"Excuse me, where's the stop? I've been lost since Tuesday.",w:1,f:"errands",h:"SKU-zi · do-VÈ · mar-te-DÌ"},
+ {it:"Sette, sette, sette: non sete. Ho sete, sono le sette.",en:"Seven, seven, seven: not thirst. I'm thirsty, it's seven o'clock.",w:1,f:"double consonants",h:"SET-te (hold tt) vs SE-te"},
+ {it:"Gli gnocchi della nonna sono famosi in tutta la famiglia.",en:"Grandma's gnocchi are famous throughout the family.",w:1,f:"gli / gn",h:"lyi NYOK-ki · fa-MI-lya"},
+ {it:"La chiesa è chiusa, il cinema è aperto, la scelta è facile.",en:"The church is closed, the cinema is open, the choice is easy.",w:1,f:"c / ch / sc",h:"KYE-za · CHI-nema · SHEL-ta · FA-chile"},
+ {it:"Cinque ciliegie, cento cetrioli, un cuoco confuso.",en:"Five cherries, a hundred cucumbers, one confused cook.",w:1,f:"c / ch / sc",h:"CHIN-kwe chi-LYE-je CHEN-to che-tri-O-li KWO-ko"},
+ {it:"C'è un piccione nel frigo e nessuno sa perché.",en:"There's a pigeon in the fridge and nobody knows why.",w:2,f:"c'è / ci sono",h:"chè · pic-CHO-ne · nel = in + il · per-KÉ"},
+ {it:"Ci sono tre gatti sul letto e nessun posto per me.",en:"There are three cats on the bed and no room for me.",w:2,f:"c'è / ci sono",h:"chi SO-no · hold tt"},
+ {it:"Ieri ho mangiato dodici cannoli e non mi pento di niente.",en:"Yesterday I ate twelve cannoli and I regret nothing.",w:2,f:"passato prossimo",h:"man-JA-to · DO-dici · can-NO-li"},
+ {it:"Abbiamo perso le chiavi, ma abbiamo trovato una tartaruga.",en:"We lost the keys, but we found a tortoise.",w:2,f:"passato prossimo",h:"ab-BIA-mo · KYA-vi · tar-ta-RU-ga"},
+ {it:"Siamo andati al mare, ma il mare era chiuso.",en:"We went to the sea, but the sea was closed.",w:2,f:"essere + participle",h:"an-DA-ti agrees with noi · al = a + il"},
+ {it:"Hai visto il mio telefono? Era nel freezer.",en:"Have you seen my phone? It was in the freezer.",w:2,f:"passato prossimo",h:"ai VI-sto · te-LE-fono"},
+ {it:"Ho letto il giornale e ora sono più triste.",en:"I read the newspaper and now I'm sadder.",w:2,f:"irregular participles",h:"LET-to · jor-NA-le · O-ra"},
+ {it:"Mia sorella è partita alle sei con il mio ombrello.",en:"My sister left at six with my umbrella.",w:2,f:"essere + participle",h:"par-TI-ta agrees with sorella · om-BREL-lo"},
+ {it:"Che cosa hai fatto ieri? Niente, ma con impegno.",en:"What did you do yesterday? Nothing, but with commitment.",w:2,f:"irregular participles",h:"ke KO-za · FAT-to · im-PE-nyo"},
+ {it:"Non ho capito niente, però ho annuito.",en:"I didn't understand anything, but I nodded.",w:2,f:"passato prossimo",h:"ca-PI-to · pe-RÒ · an-nu-I-to"},
+ {it:"Non ho tempo, non ho soldi, ma ho un ottimo caffè.",en:"I have no time, no money, but I have an excellent coffee.",w:2,f:"negation",h:"non + verb, nothing after · OT-timo"},
+ {it:"Da bambino volevo diventare una lasagna.",en:"As a child I wanted to become a lasagna.",w:3,f:"imperfetto",h:"vo-LE-vo · di-ven-TA-re · la-ZA-nya"},
+ {it:"Mentre dormivo, il cane ha imparato a cucinare.",en:"While I was sleeping, the dog learned to cook.",w:3,f:"imperfetto + passato",h:"dor-MI-vo · im-pa-RA-to"},
+ {it:"Domani andrò in palestra. Forse. Probabilmente no.",en:"Tomorrow I'll go to the gym. Maybe. Probably not.",w:3,f:"future",h:"an-DRÒ · pa-LE-stra · pro-ba-bil-MEN-te"},
+ {it:"Un giorno parlerò italiano meglio del mio frigorifero.",en:"One day I'll speak Italian better than my fridge.",w:3,f:"future",h:"par-le-RÒ · ME-lyo · fri-go-RI-fero"},
+ {it:"Quando ero giovane, il caffè costava meno di una casa.",en:"When I was young, coffee cost less than a house.",w:3,f:"imperfetto",h:"E-ro · JO-vane · co-STA-va"},
+ {it:"Ti chiamerò domani, se trovo il telefono.",en:"I'll call you tomorrow, if I find the phone.",w:3,f:"future",h:"kya-me-RÒ · TRO-vo"},
+ {it:"Pioveva, ma noi mangiavamo il gelato lo stesso.",en:"It was raining, but we ate ice cream anyway.",w:3,f:"imperfetto",h:"pyo-VE-va · man-ja-VA-mo · je-LA-to"},
+ {it:"Sarà difficile, ma sarà anche divertente. Forse.",en:"It'll be hard, but it'll also be fun. Maybe.",w:3,f:"future",h:"sa-RÀ · dif-FI-chile · di-ver-TEN-te"},
+ {it:"Mi piace la pizza. La pizza non lo sa.",en:"I like pizza. The pizza doesn't know it.",w:4,f:"piacere",h:"PYA-che · PIT-tsa (hold zz)"},
+ {it:"Mi piacciono i gatti, ma i gatti hanno altri piani.",en:"I like cats, but the cats have other plans.",w:4,f:"piacere",h:"pyat-CHO-no (loro stress on stem) · AN-no"},
+ {it:"Lo conosco, ma non mi ricordo il suo nome.",en:"I know him, but I don't remember his name.",w:4,f:"object pronouns",h:"co-NO-sco · ri-COR-do"},
+ {it:"Il treno si è fermato. Il treno fa così.",en:"The train stopped. The train does that.",w:4,f:"false friends",h:"fermare = stop, not close · co-ZÌ"},
+ {it:"Sono molto sensibile: piango per la pasta scotta.",en:"I'm very sensitive: I cry over overcooked pasta.",w:4,f:"false friends",h:"sen-SI-bile = sensitive · PYAN-go · SKOT-ta"},
+ {it:"I miei parenti sono simpatici, ma solo a Natale.",en:"My relatives are nice, but only at Christmas.",w:4,f:"false friends",h:"pa-REN-ti = relatives · sim-PA-tichi"},
+ {it:"La libreria vende libri, non silenzio.",en:"The bookshop sells books, not silence.",w:4,f:"false friends",h:"li-bre-RI-a = bookshop · si-LEN-tsyo"},
+ {it:"Mi dà un etto di prosciutto e un consiglio di vita?",en:"Could I have 100 g of ham and some life advice?",w:4,f:"errands",h:"ET-to · pro-SHUT-to · con-SI-lyo"},
+ {it:"Dove hai messo le chiavi? Le ho date al gatto.",en:"Where did you put the keys? I gave them to the cat.",w:4,f:"object pronouns",h:"le ... DA-te agrees with chiavi"},
+ {it:"Il caldo è caldo, il freddo è freddo, io sono confuso.",en:"Hot is hot, cold is cold, I am confused.",w:4,f:"false friends",h:"caldo = hot · hold dd, ff"},
+ {it:"Che buono! Posso sposare questa lasagna?",en:"Delicious! Can I marry this lasagna?",w:5,f:"dinner",h:"ke BWO-no · spo-ZA-re · KWE-sta"},
+ {it:"No grazie, sono pieno. Va bene, solo un altro pezzo.",en:"No thanks, I'm full. Fine, just one more piece.",w:5,f:"dinner",h:"GRA-tsye · PYE-no · PET-tso"},
+ {it:"L'ha fatto lei? È meglio di mia madre. Non lo dica a mia madre.",en:"Did you make it? It's better than my mother's. Don't tell my mother.",w:5,f:"dinner",h:"la FAT-to lei · ME-lyo · DI-ca"},
+ {it:"Grazie dell'invito, ho portato il vino e la fame.",en:"Thanks for the invitation, I brought the wine and my appetite.",w:5,f:"dinner",h:"del-lin-VI-to · por-TA-to · FA-me"},
+ {it:"Sto imparando l'italiano: abbiate pazienza e altro vino.",en:"I'm learning Italian: have patience and more wine.",w:5,f:"dinner",h:"im-pa-RAN-do · ab-BIA-te · pa-TSYEN-tsa"},
+ {it:"È stata una serata bellissima, soprattutto il tiramisù.",en:"It's been a wonderful evening, especially the tiramisù.",w:5,f:"dinner",h:"STA-ta · bel-LIS-sima · so-prat-TUT-to · ti-ra-mi-SÙ"},
+ {it:"Sono irlandese: piove anche dentro di me.",en:"I'm Irish: it rains inside me too.",w:5,f:"stranger",h:"ir-lan-DE-ze · PYO-ve · AN-ke"},
+ {it:"Che lavoro fai? Dormo, principalmente.",en:"What do you do? Sleep, mainly.",w:5,f:"stranger",h:"la-VO-ro · prin-chi-pal-MEN-te"},
+ {it:"Mi piace molto qui, soprattutto il caffè a un euro.",en:"I really like it here, especially the one-euro coffee.",w:5,f:"stranger",h:"MOL-to · kwi · EU-ro"},
+ {it:"Come si dice 'aiuto' in inglese? Help. Esatto, help.",en:"How do you say 'aiuto' in English? Help. Exactly, help.",w:5,f:"stranger",h:"DI-che · a-YU-to · e-ZAT-to"},
+ {it:"Secondo me la pizza con l'ananas è un crimine, ma sono aperto al dialogo.",en:"In my opinion pineapple pizza is a crime, but I'm open to dialogue.",w:5,f:"stranger",h:"se-CON-do · A-nanas · CRI-mine · di-A-logo"},
+ {it:"Davvero? Dai! Ma va! Ho finito le reazioni.",en:"Really? Come on! No way! I've run out of reactions.",w:5,f:"fillers",h:"dav-VE-ro (hold vv) · re-a-TSYO-ni"},
+ {it:"Allora, cioè, insomma, comunque: boh.",en:"So, I mean, in short, anyway: dunno.",w:5,f:"fillers",h:"al-LO-ra · CHO-è · in-SOM-ma · co-MUN-kwe"},
+ {it:"Magari! Magari domani. Magari mai.",en:"If only! Maybe tomorrow. Maybe never.",w:5,f:"fillers",h:"ma-GA-ri · do-MA-ni"},
+ {it:"Ci vediamo! O forse no, dipende dal treno.",en:"See you! Or maybe not, it depends on the train.",w:5,f:"stranger",h:"chi ve-DIA-mo · di-PEN-de · dal = da + il"},
+ {it:"Mi dispiace, il mio italiano non è ancora buono. Il mio francese però è peggio.",en:"Sorry, my Italian isn't good yet. My French is worse, though.",w:6,f:"stranger",h:"di-SPYA-che · an-CO-ra · PEJ-jo (hold gg)"},
+ {it:"Lei è di qui? Io sono di là, ma vorrei essere di qua.",en:"Are you from here? I'm from over there, but I'd like to be from over here.",w:6,f:"Lei (polite you)",h:"Lei + 3rd person · di KWI · di LÀ"},
+ {it:"Qui si mangia bene e si dorme male. Colpa del caffè.",en:"Here one eats well and sleeps badly. Blame the coffee.",w:6,f:"impersonal si",h:"si MAN-ja · COL-pa"},
+ {it:"Anche io ho fame, anche io sono stanco, anche io voglio un gelato.",en:"I'm hungry too, I'm tired too, I want an ice cream too.",w:6,f:"anche",h:"AN-ke goes first · VO-lyo"},
+];
+
+// ---------- state ----------
+const $ = id => document.getElementById(id);
+let filter = {w:0, f:""};
+let order = DECK.map((_,i)=>i);
+let pos = 0;
+let progress = load('pappagallo-progress', {});
+let prefs = load('pappagallo-prefs', {en:true, rate:0.85, pos:0});
+let recording = false, mediaRec = null, chunks = [], myBlob = null, myUrl = null, recog = null, lastTranscript = "", recStart = 0;
+
+function load(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+// ---------- filters ----------
+const FOCI = [...new Set(DECK.map(s=>s.f))];
+function renderFilters(){
+  const el = $('filters'); el.innerHTML = '';
+  const strip = document.createElement('div'); strip.className='weeks'; el.appendChild(strip);
+  const mk = (label, pressed, fn) => { const b=document.createElement('button'); b.className='chip'; b.textContent=label; b.setAttribute('aria-pressed', pressed); b.onclick=fn; strip.appendChild(b); return b; };
+  mk('All', filter.w===0 && !filter.f, ()=>{filter={w:0,f:""}; applyFilter();});
+  for(let w=1; w<=6; w++) mk('Week '+w, filter.w===w, ()=>{filter={w, f:""}; applyFilter();});
+  const sel = document.createElement('select'); sel.className='chip'; sel.id='focus-sel';
+  sel.innerHTML = '<option value="">Focus…</option>' + FOCI.map(f=>`<option value="${f}" ${filter.f===f?'selected':''}>${f}</option>`).join('');
+  sel.onchange = ()=>{ filter={w:0, f:sel.value}; applyFilter(); };
+  el.appendChild(sel);
+  const sp = document.createElement('span'); sp.className='spacer'; el.appendChild(sp);
+  const g = document.createElement('button'); g.className='ghost'; g.textContent="Today's 10"; g.title='Ten sentences, weakest first'; g.onclick=todaysTen; el.appendChild(g);
+}
+function applyFilter(){
+  order = DECK.map((_,i)=>i).filter(i => (filter.w===0 || DECK[i].w===filter.w) && (!filter.f || DECK[i].f===filter.f));
+  if(order.length===0) order = DECK.map((_,i)=>i);
+  pos = 0; renderFilters(); show();
+}
+function todaysTen(){
+  const scored = i => (progress[i]?.best ?? -1);
+  const pool = DECK.map((_,i)=>i).sort((a,b)=> scored(a)-scored(b) || Math.random()-0.5);
+  order = pool.slice(0,10); filter={w:0,f:""}; pos=0; renderFilters(); show();
+  $('note').textContent = "Today's 10: the sentences you've scored lowest (or never tried), in order.";
+}
+
+// ---------- render ----------
+function cur(){ return DECK[order[pos]]; }
+function show(){
+  const s = cur(), i = order[pos];
+  $('focus').textContent = s.f; $('week').textContent = 'week '+s.w; $('pos').textContent = (pos+1)+' / '+order.length;
+  $('it').textContent = s.it; $('hint').innerHTML = s.h ? s.h.replace(/([A-ZÀÈÌÒÙÉ]{2,})/g,'<b>$1</b>') : '';
+  $('en').textContent = s.en; $('en').hidden = !prefs.en; $('toggle-en').setAttribute('aria-pressed', prefs.en);
+  const p = progress[i];
+  $('score').hidden = !p;
+  if(p){ $('num').textContent = p.last+'%'; $('num').className='num '+grade(p.last); $('best').textContent=p.best+'%'; $('tries').textContent=p.tries; $('verdict').textContent=verdict(p.last); $('heard').innerHTML = p.heardHtml || ''; }
+  myBlob=null; if(myUrl){URL.revokeObjectURL(myUrl); myUrl=null;} $('playme').disabled = true;
+  renderDots(); renderStat();
+  prefs.pos = i; save('pappagallo-prefs', prefs);
+}
+function grade(n){ return n>=85?'good':n>=65?'warn':'bad'; }
+function verdict(n){ return n>=95?'Nailed it. Next.':n>=85?'Good. Once more for the ear.':n>=65?'Close. Check the highlighted words and the hint.':'Slow it down, listen twice, try again.'; }
+function renderDots(){
+  const el=$('dots'); el.innerHTML='';
+  order.forEach((i,k)=>{ const b=document.createElement('button'); b.className='dot '+(progress[i]?grade(progress[i].best):'')+(k===pos?' cur':''); b.title=DECK[i].it; b.setAttribute('aria-label','Sentence '+(k+1)); b.onclick=()=>{pos=k;show();}; el.appendChild(b); });
+}
+function renderStat(){
+  const done = Object.keys(progress).length, tot = DECK.length;
+  const avg = done ? Math.round(Object.values(progress).reduce((a,p)=>a+p.best,0)/done) : null;
+  $('stat').innerHTML = `<b>${done}</b> / ${tot} scored${avg!==null?` · best avg <b>${avg}%</b>`:''}`;
+}
+
+// ---------- TTS ----------
+// Voices load asynchronously and some browsers report an empty list for a while, so we poll before concluding anything.
+let voices = [], allVoices = [];
+function pickVoice(){
+  allVoices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
+  voices = allVoices.filter(v => /^it/i.test(v.lang));
+  const pref = voices.find(v=>/google|alice|federica|luca|paola|elsa|natural|premium|enhanced/i.test(v.name)) || voices[0];
+  return pref || null;
+}
+function waitForVoices(ms=2500){
+  return new Promise(res => {
+    if(pickVoice()) return res(true);
+    const t0=Date.now();
+    const tick=()=>{ if(pickVoice()) return res(true); if(Date.now()-t0>ms) return res(false); setTimeout(tick,150); };
+    if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = tick;
+    tick();
+  });
+}
+let voiceChecked = false;
+async function listen(){
+  if(!('speechSynthesis' in window)){ $('note').textContent='This browser has no text-to-speech.'; return; }
+  const ok = voiceChecked ? !!pickVoice() : await waitForVoices();
+  voiceChecked = true;
+  if(!ok){ openVoiceGuide(); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(cur().it);
+  const v = pickVoice(); u.voice = v; u.lang='it-IT'; u.rate = prefs.rate;
+  $('note').textContent = '';
+  speechSynthesis.speak(u);
+}
+
+// ---------- voice setup guide (shown when the device has no Italian voice) ----------
+function detectOS(){
+  const ua = navigator.userAgent;
+  if(/iPhone|iPad|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1)) return 'ios';
+  if(/Android/.test(ua)) return 'android';
+  if(/Macintosh/.test(ua)) return 'mac';
+  if(/Windows/.test(ua)) return 'windows';
+  return 'other';
+}
+const GUIDES = {
+  ios: ['Open <b>Settings</b> → <b>Accessibility</b> → <b>Spoken Content</b> → <b>Voices</b>.','Choose <b>Italian</b> and download a voice (Alice or Federica; the “Enhanced” or “Premium” version sounds best).','Come back here and tap <b>Check again</b>. In Safari the new voice appears straight away; in Chrome you may need to reopen the tab.'],
+  android: ['Open <b>Settings</b> → <b>System</b> (or <b>General management</b> on Samsung) → <b>Languages &amp; input</b> → <b>Text-to-speech output</b>.','Tap the gear next to <b>Speech Recognition and Synthesis from Google</b> (or Samsung TTS) → <b>Install voice data</b> → <b>Italiano</b>.','Return here and tap <b>Check again</b>. If it still fails, close and reopen the browser tab.'],
+  mac: ['Open <b>System Settings</b> → <b>Accessibility</b> → <b>Spoken Content</b> → <b>System voice</b> → <b>Manage Voices…</b>.','Tick an Italian voice (Alice, Federica or Luca) and let it download.','Come back and tap <b>Check again</b>.'],
+  windows: ['Open <b>Settings</b> → <b>Time &amp; language</b> → <b>Language &amp; region</b> → <b>Add a language</b> → <b>Italiano</b>, with <b>Text-to-speech</b> ticked.','Chrome and Edge pick up the new voice after a restart of the browser.','Come back and tap <b>Check again</b>.'],
+  other: ['Install an Italian text-to-speech voice in your operating system’s language or accessibility settings.','Restart the browser, come back and tap <b>Check again</b>.']
+};
+function openVoiceGuide(){
+  const os = detectOS();
+  const d = $('voice-guide');
+  $('vg-os').textContent = {ios:'iPhone / iPad', android:'Android', mac:'Mac', windows:'Windows', other:'this device'}[os];
+  $('vg-steps').innerHTML = GUIDES[os].map(s=>`<li>${s}</li>`).join('');
+  $('vg-found').textContent = allVoices.length ? `Voices on this device: ${allVoices.length}; Italian: ${voices.length}.` : 'The browser reported no voices at all yet; if you just opened the page, try Check again first.';
+  d.hidden = false; $('vg-check').focus();
+}
+$('vg-check').onclick = async () => {
+  $('vg-check').textContent='Checking…';
+  const ok = await waitForVoices(3000);
+  $('vg-check').textContent='Check again';
+  if(ok){ $('voice-guide').hidden = true; $('note').textContent = `Italian voice found: ${pickVoice().name}.`; listen(); }
+  else { $('vg-found').textContent = allVoices.length ? `Still no Italian voice (${allVoices.length} other voices). Reopen the tab after installing.` : 'Still no voices reported by this browser.'; }
+};
+$('vg-anyway').onclick = () => { $('voice-guide').hidden = true; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(cur().it); u.lang='it-IT'; u.rate=prefs.rate; speechSynthesis.speak(u); $('note').className='note warn'; $('note').textContent='Playing with a non-Italian voice: fine for rhythm, do not copy the vowels.'; };
+$('vg-close').onclick = () => { $('voice-guide').hidden = true; };
+
+// ---------- recording + scoring ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+async function startRec(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ noMic(); return; }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ noMic(); return; }
+  chunks=[]; lastTranscript="";
+  try{ mediaRec = new MediaRecorder(stream); }catch(e){ noMic(); stream.getTracks().forEach(t=>t.stop()); return; }
+  mediaRec.ondataavailable = e => chunks.push(e.data);
+  mediaRec.onstop = () => { stream.getTracks().forEach(t=>t.stop()); myBlob = new Blob(chunks,{type: mediaRec.mimeType||'audio/webm'}); if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(myBlob); $('playme').disabled=false; };
+  mediaRec.start();
+  if(SR){
+    recog = new SR(); recog.lang='it-IT'; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=true;
+    recog.onresult = e => { let t=''; for(let i=0;i<e.results.length;i++){ t += e.results[i][0].transcript+' '; } lastTranscript = t.trim(); };
+    recog.onerror = e => { if(e.error!=='no-speech' && e.error!=='aborted') $('note').textContent='Speech recognition error: '+e.error; };
+    recog.onend = () => { if(recording){ try{recog.start();}catch(e){} } else { scoreIt(); } };
+    try{ recog.start(); }catch(e){}
+  } else {
+    $('note').textContent='Recording works, but this browser cannot transcribe Italian for scoring. Chrome or Safari can.';
+  }
+  recording=true; recStart=Date.now(); $('rec').dataset.on='true'; $('rec').textContent='■ Stop'; $('note').textContent='Recording… say it, then stop.';
+}
+function stopRec(){
+  recording=false; $('rec').dataset.on='false'; $('rec').textContent='● Record';
+  if(mediaRec && mediaRec.state!=='inactive') mediaRec.stop();
+  if(recog){ try{ recog.stop(); }catch(e){} } else { $('note').textContent='Saved. Play it back against the model.'; }
+}
+let micBlocked = false;
+function noMic(){
+  micBlocked = true;
+  $('note').className='note warn';
+  $('note').textContent='The microphone is blocked in this hosted view. Two ways round it:';
+  $('fallback').hidden = false;
+  $('rec').hidden = true;
+}
+// Fallback 1: hand the viewer the full version as a file (needs the downloads capability; hidden when absent).
+(async () => {
+  const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+  if(!dl){ $('getfull').hidden = true; return; }
+  $('getfull').onclick = async () => {
+    $('getfull').disabled = true; $('getfull').textContent = 'Preparing…';
+    try{
+      const r = await fetch('full/pappagallo-local.html'); if(!r.ok) throw new Error('fetch');
+      const blob = await r.blob();
+      await dl.save({filename:'pappagallo.html', data: blob});
+      $('note').textContent = 'Saved. Open pappagallo.html in Chrome (Files app → open with Chrome on Android; any browser on a computer). It records and scores there.';
+    }catch(e){
+      if(e && e.code==='declined') $('note').textContent='No problem; the button is here when you want it.';
+      else $('note').textContent='Could not save the file here. Use the pappagallo-local.html file from the chat instead.';
+    }
+    $('getfull').disabled = false; $('getfull').textContent = 'Save the full version';
+  };
+})();
+// Fallback 2: record with the phone's own recorder through a file picker, then A/B it against the model.
+$('upload').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  myBlob = f; if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(f); $('playme').disabled = false;
+  $('note').className='note'; $('note').textContent='Loaded your recording. Tap Listen, then Play me, and compare the two. No score in this view.';
+  e.target.value = '';
+};
+function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9'\s]/g,' ').replace(/\s+/g,' ').trim(); }
+function lev(a,b){ const m=a.length,n=b.length; if(!m) return n; if(!n) return m; let prev=[...Array(n+1).keys()], curr=new Array(n+1);
+  for(let i=1;i<=m;i++){ curr[0]=i; for(let j=1;j<=n;j++){ curr[j]=Math.min(prev[j]+1,curr[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); } [prev,curr]=[curr,prev]; } return prev[n]; }
+function sim(a,b){ const d=lev(a,b); return 1 - d/Math.max(a.length,b.length,1); }
+function scoreIt(){
+  const target = norm(cur().it), heard = norm(lastTranscript);
+  const i = order[pos];
+  if(!heard){ $('note').textContent='Nothing was transcribed. Try again a little louder, closer to the mic.'; return; }
+  const overall = Math.round(100*sim(target,heard));
+  // word-level diff for feedback
+  const tw = target.split(' '), hw = heard.split(' ');
+  const used = new Array(hw.length).fill(false);
+  const html = tw.map(w => { let best=-1,bs=0; hw.forEach((h,k)=>{ if(used[k]) return; const s=sim(w,h); if(s>bs){bs=s;best=k;} });
+    if(bs>=0.85){ used[best]=true; return `<span class="w ok">${w}</span>`; }
+    if(bs>=0.6){ used[best]=true; return `<span class="w near" title="heard: ${hw[best]}">${w}</span>`; }
+    return `<span class="w miss">${w}</span>`; }).join('');
+  const p = progress[i] || {best:0,tries:0,last:0};
+  p.tries++; p.last=overall; p.best=Math.max(p.best,overall); p.heardHtml = html + `<div class="note">heard: “${lastTranscript}”</div>`;
+  progress[i]=p; save('pappagallo-progress', progress);
+  $('note').className='note'; $('note').textContent='';
+  show();
+}
+
+// ---------- wire up ----------
+$('listen').onclick = listen;
+$('rec').onclick = () => recording ? stopRec() : startRec();
+$('playme').onclick = () => { if(!myUrl) return; const a=new Audio(myUrl); a.play().catch(()=>{}); };
+$('rate').value = prefs.rate; $('rateval').textContent = prefs.rate.toFixed(2)+'×';
+$('rate').oninput = e => { prefs.rate = parseFloat(e.target.value); $('rateval').textContent=prefs.rate.toFixed(2)+'×'; save('pappagallo-prefs',prefs); };
+$('toggle-en').onclick = () => { prefs.en=!prefs.en; save('pappagallo-prefs',prefs); show(); };
+$('prev').onclick = () => { pos=(pos-1+order.length)%order.length; show(); };
+$('next').onclick = () => { pos=(pos+1)%order.length; show(); };
+document.addEventListener('keydown', e => {
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  const k=e.key.toLowerCase();
+  if(e.key==='ArrowRight'){$('next').click();} else if(e.key==='ArrowLeft'){$('prev').click();}
+  else if(k==='l'){listen();} else if(k==='r'){$('rec').click();} else if(k==='m'){$('playme').click();} else if(k==='e'){$('toggle-en').click();}
+});
+// restore position
+const startIdx = order.indexOf(prefs.pos); if(startIdx>=0) pos=startIdx;
+renderFilters(); show();
+</script>
+</body></html>
