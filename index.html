@@ -53,7 +53,7 @@ h1 small{display:block;font-family:var(--body);font-weight:500;font-size:13px;co
 .en[hidden]{display:none}
 
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .controls .big{justify-content:center;padding-inline:6px;white-space:nowrap;min-width:0;font-size:14px}
 .subrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .subrow .speed{flex:1 1 180px}
@@ -63,6 +63,8 @@ button.big{border:0;border-radius:10px;padding:12px 18px;font:600 15px var(--bod
 .listen{background:var(--fg);color:var(--bg)}
 .rec{background:var(--accent);color:var(--accent-ink)}
 .rec[data-on="true"]{background:var(--bad);animation:pulse 1.2s infinite}
+.alt{background:var(--surface);color:var(--fg);border:1px solid var(--line)!important}
+.alt[data-on="true"]{background:var(--accent-soft);color:var(--bad);animation:pulse 1.2s infinite}
 .me{background:var(--you-soft);color:var(--you)}
 button:disabled{opacity:.45;cursor:not-allowed}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(181,52,46,.45)}50%{box-shadow:0 0 0 10px rgba(181,52,46,0)}}
@@ -120,7 +122,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-r
 
     <div class="controls">
       <button class="big listen" id="listen">▶ Listen</button>
-      <button class="big rec" id="rec" data-on="false">● Record</button>
+      <button class="big rec" id="score-btn" data-on="false">● Score</button>
+      <button class="big alt" id="rec" data-on="false">● Record</button>
       <button class="big me" id="playme" disabled>▶ Play me</button>
     </div>
     <div class="subrow">
@@ -147,7 +150,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-r
     <div class="dots" id="dots" aria-label="Progress"></div>
     <button id="next">Next →</button>
   </nav>
-  <p class="foot"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>L</kbd> listen · <kbd>R</kbd> record/stop · <kbd>M</kbd> play me · <kbd>E</kbd> English</p>
+  <p class="foot"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>L</kbd> listen · <kbd>S</kbd> score · <kbd>R</kbd> record · <kbd>M</kbd> play me · <kbd>E</kbd> English</p>
 </div>
 
 <div class="overlay" id="voice-guide" hidden role="dialog" aria-modal="true" aria-labelledby="vg-title">
@@ -366,46 +369,74 @@ $('vg-check').onclick = async () => {
 $('vg-anyway').onclick = () => { $('voice-guide').hidden = true; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(cur().it); u.lang='it-IT'; u.rate=prefs.rate; speechSynthesis.speak(u); $('note').className='note warn'; $('note').textContent='Playing with a non-Italian voice: fine for rhythm, do not copy the vowels.'; };
 $('vg-close').onclick = () => { $('voice-guide').hidden = true; };
 
-// ---------- recording + scoring ----------
+// ---------- recording (audio only) and scoring (speech recognition) ----------
+// Android Chrome cannot run getUserMedia and SpeechRecognition at the same time (the recogniser gets no audio and
+// reports "network"), so the two are separate buttons. On other platforms Score also records in the background.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-async function startRec(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ noMic(); return; }
+const isAndroid = /Android/i.test(navigator.userAgent);
+let listening = false;
+
+async function startRec(quiet){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ noMic(); return false; }
   let stream;
-  try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ noMic(); return; }
-  chunks=[]; lastTranscript="";
-  try{ mediaRec = new MediaRecorder(stream); }catch(e){ noMic(); stream.getTracks().forEach(t=>t.stop()); return; }
+  try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ noMic(); return false; }
+  chunks=[];
+  try{ mediaRec = new MediaRecorder(stream); }catch(e){ noMic(); stream.getTracks().forEach(t=>t.stop()); return false; }
   mediaRec.ondataavailable = e => chunks.push(e.data);
   mediaRec.onstop = () => { stream.getTracks().forEach(t=>t.stop()); myBlob = new Blob(chunks,{type: mediaRec.mimeType||'audio/webm'}); if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(myBlob); $('playme').disabled=false; };
   mediaRec.start();
-  if(SR){
-    recog = new SR(); recog.lang='it-IT'; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=false;
-    let finalText = '';
-    recog.onresult = e => { let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) finalText += e.results[i][0].transcript+' '; else interim += e.results[i][0].transcript; } lastTranscript = (finalText+interim).trim(); };
-    recog.onerror = e => {
-      if(e.error==='no-speech' || e.error==='aborted') return;
-      $('note').className='note warn';
-      if(e.error==='network'){
-        recog = null;
-        $('note').textContent="This browser can't reach a speech-to-text service, so there is no score (Brave, Edge, Vivaldi and offline Chrome all do this). Your recording is still saved for Play me. For scoring use Google Chrome on Android or a computer, or Safari on iPhone and Mac.";
-      } else if(e.error==='not-allowed' || e.error==='service-not-allowed'){
-        recog = null;
-        $('note').textContent='Microphone access for speech recognition was refused. Allow the microphone for this site in the browser settings, then reload.';
-      } else {
-        $('note').textContent='Speech recognition error: '+e.error;
-      }
-    };
-    const inst = recog;
-    recog.onend = () => { if(recog!==inst) return; /* an error already explained itself */ if(recording){ try{inst.start();}catch(e){} } else { scoreIt(); } };
-    try{ recog.start(); }catch(e){}
-  } else {
-    $('note').textContent='Recording works, but this browser cannot transcribe Italian for scoring. Chrome or Safari can.';
-  }
-  recording=true; recStart=Date.now(); $('rec').dataset.on='true'; $('rec').textContent='■ Stop'; $('note').textContent='Recording… say it, then stop.';
+  recording=true; recStart=Date.now(); $('rec').dataset.on='true'; $('rec').textContent='■ Stop';
+  if(!quiet){ $('note').className='note'; $('note').textContent='Recording… say it, then tap Stop. Then Listen and Play me to compare.'; }
+  return true;
 }
 function stopRec(){
   recording=false; $('rec').dataset.on='false'; $('rec').textContent='● Record';
   if(mediaRec && mediaRec.state!=='inactive') mediaRec.stop();
-  if(recog){ try{ recog.stop(); }catch(e){} } else if(!$('note').classList.contains('warn')){ $('note').textContent='Saved. Play it back against the model.'; }
+  if(!listening && !$('note').classList.contains('warn')){ $('note').textContent='Saved. Listen, then Play me.'; }
+}
+
+function startScore(){
+  if(!SR){ $('note').className='note warn'; $('note').textContent='This browser has no speech recognition, so it cannot score. Chrome (Android or computer) and Safari can; Record and Play me still work here.'; return; }
+  lastTranscript=''; let finalText=''; let restarts=0;
+  const inst = new SR(); recog = inst;
+  inst.lang='it-IT'; inst.interimResults=true; inst.maxAlternatives=3; inst.continuous=true;
+  inst.onresult = e => { let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) finalText += e.results[i][0].transcript+' '; else interim += e.results[i][0].transcript; } lastTranscript = (finalText+interim).trim(); };
+  inst.onerror = e => {
+    if(e.error==='no-speech' || e.error==='aborted') return;
+    $('note').className='note warn';
+    if(e.error==='network'){
+      $('note').textContent = isAndroid
+        ? "Chrome's speech service didn't answer. Check the phone is online and that Google's speech recognition is installed (Settings → System → Languages → Speech → Speech recognition), then try Score again."
+        : "This browser can't reach a speech-to-text service, so there is no score (Brave, Edge, Vivaldi and offline Chrome all do this). Record and Play me still work. For scoring use Google Chrome or Safari.";
+    } else if(e.error==='not-allowed' || e.error==='service-not-allowed'){
+      $('note').textContent='Microphone access for speech recognition was refused. Allow the microphone for this site in the browser settings, then reload.';
+    } else if(e.error==='audio-capture'){
+      $('note').textContent='No microphone audio reached the recogniser. If another app or tab is using the mic, close it and try Score again.';
+    } else {
+      $('note').textContent='Speech recognition error: '+e.error;
+    }
+    recog = null; finishScore(false);
+  };
+  inst.onend = () => {
+    if(recog!==inst) return;
+    // Chrome ends a session at every pause; keep going until the person taps Stop.
+    if(listening && restarts<12){ restarts++; try{ inst.start(); }catch(e){ finishScore(true); } }
+    else { finishScore(true); }
+  };
+  function finishScore(doScore){
+    listening=false; recog=null; $('score-btn').dataset.on='false'; $('score-btn').textContent='● Score';
+    if(recording) stopRec();
+    if(doScore) scoreIt();
+  }
+  listening=true; $('score-btn').dataset.on='true'; $('score-btn').textContent='■ Stop';
+  $('note').className='note'; $('note').textContent = isAndroid ? 'Listening… say the sentence, then tap Stop.' : 'Listening and recording… say the sentence, then tap Stop.';
+  try{ inst.start(); }catch(e){ $('note').className='note warn'; $('note').textContent='Could not start speech recognition: '+(e.message||e); finishScore(false); return; }
+  if(!isAndroid) startRec(true);
+}
+function stopScore(){
+  listening=false;
+  if(recog){ try{ recog.stop(); }catch(e){} }
+  if(recording) stopRec();
 }
 let micBlocked = false;
 function noMic(){
@@ -413,7 +444,7 @@ function noMic(){
   $('note').className='note warn';
   $('note').textContent='The microphone is blocked in this hosted view. Two ways round it:';
   $('fallback').hidden = false;
-  $('rec').hidden = true;
+  $('rec').hidden = true; $('score-btn').hidden = true;
 }
 // Fallback 1: hand the viewer the full version as a file (needs the downloads capability; hidden when absent).
 (async () => {
@@ -447,7 +478,7 @@ function sim(a,b){ const d=lev(a,b); return 1 - d/Math.max(a.length,b.length,1);
 function scoreIt(){
   const target = norm(cur().it), heard = norm(lastTranscript);
   const i = order[pos];
-  if(!heard){ if(!$('note').classList.contains('warn')) $('note').textContent='Nothing was transcribed. Hold Record for a second before speaking, speak up, and stop a beat after you finish.'; return; }
+  if(!heard){ if(!$('note').classList.contains('warn')) $('note').textContent='Nothing was heard. Tap Score, wait half a second, say the sentence clearly, then tap Stop.'; return; }
   const overall = Math.round(100*sim(target,heard));
   // word-level diff for feedback
   const tw = target.split(' '), hw = heard.split(' ');
@@ -465,7 +496,8 @@ function scoreIt(){
 
 // ---------- wire up ----------
 $('listen').onclick = listen;
-$('rec').onclick = () => recording ? stopRec() : startRec();
+$('rec').onclick = () => recording ? stopRec() : startRec(false);
+$('score-btn').onclick = () => listening ? stopScore() : startScore();
 $('playme').onclick = () => { if(!myUrl) return; const a=new Audio(myUrl); a.play().catch(()=>{}); };
 $('rate').value = prefs.rate; $('rateval').textContent = prefs.rate.toFixed(2)+'×';
 $('rate').oninput = e => { prefs.rate = parseFloat(e.target.value); $('rateval').textContent=prefs.rate.toFixed(2)+'×'; save('pappagallo-prefs',prefs); };
@@ -476,7 +508,7 @@ document.addEventListener('keydown', e => {
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
   const k=e.key.toLowerCase();
   if(e.key==='ArrowRight'){$('next').click();} else if(e.key==='ArrowLeft'){$('prev').click();}
-  else if(k==='l'){listen();} else if(k==='r'){$('rec').click();} else if(k==='m'){$('playme').click();} else if(k==='e'){$('toggle-en').click();}
+  else if(k==='l'){listen();} else if(k==='r'){$('rec').click();} else if(k==='s'){$('score-btn').click();} else if(k==='m'){$('playme').click();} else if(k==='e'){$('toggle-en').click();}
 });
 // restore position
 const startIdx = order.indexOf(prefs.pos); if(startIdx>=0) pos=startIdx;
