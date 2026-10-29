@@ -63,8 +63,7 @@ button.big{border:0;border-radius:10px;padding:12px 18px;font:600 15px var(--bod
 .listen{background:var(--fg);color:var(--bg)}
 .rec{background:var(--accent);color:var(--accent-ink)}
 .rec[data-on="true"]{background:var(--bad);animation:pulse 1.2s infinite}
-.alt{background:var(--surface);color:var(--fg);border:1px solid var(--line)!important}
-.alt[data-on="true"]{background:var(--accent-soft);color:var(--bad);animation:pulse 1.2s infinite}
+.linkbtn{border:0;background:none;color:var(--you);font:600 14px var(--body);padding:4px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .me{background:var(--you-soft);color:var(--you)}
 button:disabled{opacity:.45;cursor:not-allowed}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(181,52,46,.45)}50%{box-shadow:0 0 0 10px rgba(181,52,46,0)}}
@@ -122,9 +121,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-r
 
     <div class="controls">
       <button class="big listen" id="listen">▶ Listen</button>
-      <button class="big rec" id="score-btn" data-on="false">● Score</button>
-      <button class="big alt" id="rec" data-on="false">● Record</button>
-      <button class="big me" id="playme" disabled>▶ Play me</button>
+      <button class="big rec" id="score-btn" data-on="false">● Repeat</button>
     </div>
     <div class="subrow">
       <label class="speed">Speed <input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="0.85"><span id="rateval">0.85×</span></label>
@@ -133,15 +130,15 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-r
 
     <div class="score" id="score" hidden>
       <div class="num" id="num">—</div>
-      <div><div class="lbl">Best <span id="best">—</span> · attempts <span id="tries">0</span></div><div class="note" id="verdict"></div></div>
+      <div><div class="lbl">Best <span id="best">—</span> · attempts <span id="tries">0</span></div><div class="note" id="verdict"></div><button class="linkbtn" id="playme" hidden>▶ Play my take</button></div>
       <div class="heard" id="heard"></div>
     </div>
     <div class="note" id="note"></div>
     <div class="row" id="fallback" hidden>
       <button class="big listen" id="getfull">Save the full version</button>
-      <label class="big me" for="upload" style="cursor:pointer">⏺ Record with my phone's recorder</label>
+      <label class="big me" for="upload" style="cursor:pointer">⏺ Load a take from my phone's recorder</label>
       <input type="file" id="upload" accept="audio/*" capture hidden>
-      <span class="note">The full version records and scores in Chrome. The recorder option plays your take against the model, without a score.</span>
+      <span class="note">The full version scores in Chrome or Safari. A loaded take plays against the model, without a score.</span>
     </div>
   </section>
 
@@ -150,7 +147,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-r
     <div class="dots" id="dots" aria-label="Progress"></div>
     <button id="next">Next →</button>
   </nav>
-  <p class="foot"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>L</kbd> listen · <kbd>S</kbd> score · <kbd>R</kbd> record · <kbd>M</kbd> play me · <kbd>E</kbd> English</p>
+  <p class="foot"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>L</kbd> listen · <kbd>R</kbd> repeat/stop · <kbd>M</kbd> play my take · <kbd>E</kbd> English</p>
 </div>
 
 <div class="overlay" id="voice-guide" hidden role="dialog" aria-modal="true" aria-labelledby="vg-title">
@@ -288,7 +285,7 @@ function show(){
   const p = progress[i];
   $('score').hidden = !p;
   if(p){ $('num').textContent = p.last+'%'; $('num').className='num '+grade(p.last); $('best').textContent=p.best+'%'; $('tries').textContent=p.tries; $('verdict').textContent=verdict(p.last); $('heard').innerHTML = p.heardHtml || ''; }
-  myBlob=null; if(myUrl){URL.revokeObjectURL(myUrl); myUrl=null;} $('playme').disabled = true;
+  myBlob=null; if(myUrl){URL.revokeObjectURL(myUrl); myUrl=null;} $('playme').hidden = true;
   renderDots(); renderStat();
   prefs.pos = i; save('pappagallo-prefs', prefs);
 }
@@ -383,20 +380,18 @@ async function startRec(quiet){
   chunks=[];
   try{ mediaRec = new MediaRecorder(stream); }catch(e){ noMic(); stream.getTracks().forEach(t=>t.stop()); return false; }
   mediaRec.ondataavailable = e => chunks.push(e.data);
-  mediaRec.onstop = () => { stream.getTracks().forEach(t=>t.stop()); myBlob = new Blob(chunks,{type: mediaRec.mimeType||'audio/webm'}); if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(myBlob); $('playme').disabled=false; };
+  mediaRec.onstop = () => { stream.getTracks().forEach(t=>t.stop()); myBlob = new Blob(chunks,{type: mediaRec.mimeType||'audio/webm'}); if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(myBlob); $('playme').hidden=false; };
   mediaRec.start();
-  recording=true; recStart=Date.now(); $('rec').dataset.on='true'; $('rec').textContent='■ Stop';
-  if(!quiet){ $('note').className='note'; $('note').textContent='Recording… say it, then tap Stop. Then Listen and Play me to compare.'; }
+  recording=true; recStart=Date.now();
   return true;
 }
 function stopRec(){
-  recording=false; $('rec').dataset.on='false'; $('rec').textContent='● Record';
+  recording=false;
   if(mediaRec && mediaRec.state!=='inactive') mediaRec.stop();
-  if(!listening && !$('note').classList.contains('warn')){ $('note').textContent='Saved. Listen, then Play me.'; }
 }
 
 function startScore(){
-  if(!SR){ $('note').className='note warn'; $('note').textContent='This browser has no speech recognition, so it cannot score. Chrome (Android or computer) and Safari can; Record and Play me still work here.'; return; }
+  if(!SR){ $('note').className='note warn'; $('note').textContent='This browser has no speech recognition, so it cannot score. Chrome (Android or computer) and Safari can.'; return; }
   lastTranscript=''; let finalText=''; let restarts=0;
   const inst = new SR(); recog = inst;
   inst.lang='it-IT'; inst.interimResults=true; inst.maxAlternatives=3; inst.continuous=true;
@@ -406,12 +401,12 @@ function startScore(){
     $('note').className='note warn';
     if(e.error==='network'){
       $('note').textContent = isAndroid
-        ? "Chrome's speech service didn't answer. Check the phone is online and that Google's speech recognition is installed (Settings → System → Languages → Speech → Speech recognition), then try Score again."
-        : "This browser can't reach a speech-to-text service, so there is no score (Brave, Edge, Vivaldi and offline Chrome all do this). Record and Play me still work. For scoring use Google Chrome or Safari.";
+        ? "Chrome's speech service didn't answer. Check the phone is online and that Google's speech recognition is installed (Settings → System → Languages → Speech → Speech recognition), then try again."
+        : "This browser can't reach a speech-to-text service, so there is no score (Brave, Edge, Vivaldi and offline Chrome all do this). Use Google Chrome or Safari.";
     } else if(e.error==='not-allowed' || e.error==='service-not-allowed'){
       $('note').textContent='Microphone access for speech recognition was refused. Allow the microphone for this site in the browser settings, then reload.';
     } else if(e.error==='audio-capture'){
-      $('note').textContent='No microphone audio reached the recogniser. If another app or tab is using the mic, close it and try Score again.';
+      $('note').textContent='No microphone audio reached the recogniser. If another app or tab is using the mic, close it and try again.';
     } else {
       $('note').textContent='Speech recognition error: '+e.error;
     }
@@ -424,12 +419,12 @@ function startScore(){
     else { finishScore(true); }
   };
   function finishScore(doScore){
-    listening=false; recog=null; $('score-btn').dataset.on='false'; $('score-btn').textContent='● Score';
+    listening=false; recog=null; $('score-btn').dataset.on='false'; $('score-btn').textContent='● Repeat';
     if(recording) stopRec();
     if(doScore) scoreIt();
   }
   listening=true; $('score-btn').dataset.on='true'; $('score-btn').textContent='■ Stop';
-  $('note').className='note'; $('note').textContent = isAndroid ? 'Listening… say the sentence, then tap Stop.' : 'Listening and recording… say the sentence, then tap Stop.';
+  $('note').className='note'; $('note').textContent = 'Listening… say the sentence, then tap Stop.';
   try{ inst.start(); }catch(e){ $('note').className='note warn'; $('note').textContent='Could not start speech recognition: '+(e.message||e); finishScore(false); return; }
   if(!isAndroid) startRec(true);
 }
@@ -444,7 +439,7 @@ function noMic(){
   $('note').className='note warn';
   $('note').textContent='The microphone is blocked in this hosted view. Two ways round it:';
   $('fallback').hidden = false;
-  $('rec').hidden = true; $('score-btn').hidden = true;
+  $('score-btn').hidden = true;
 }
 // Fallback 1: hand the viewer the full version as a file (needs the downloads capability; hidden when absent).
 (async () => {
@@ -467,8 +462,8 @@ function noMic(){
 // Fallback 2: record with the phone's own recorder through a file picker, then A/B it against the model.
 $('upload').onchange = e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;
-  myBlob = f; if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(f); $('playme').disabled = false;
-  $('note').className='note'; $('note').textContent='Loaded your recording. Tap Listen, then Play me, and compare the two. No score in this view.';
+  myBlob = f; if(myUrl) URL.revokeObjectURL(myUrl); myUrl = URL.createObjectURL(f); $('score').hidden=false; $('playme').hidden = false;
+  $('note').className='note'; $('note').textContent='Loaded your recording. Tap Listen, then Play my take, and compare the two. No score in this view.';
   e.target.value = '';
 };
 function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9'\s]/g,' ').replace(/\s+/g,' ').trim(); }
@@ -478,7 +473,7 @@ function sim(a,b){ const d=lev(a,b); return 1 - d/Math.max(a.length,b.length,1);
 function scoreIt(){
   const target = norm(cur().it), heard = norm(lastTranscript);
   const i = order[pos];
-  if(!heard){ if(!$('note').classList.contains('warn')) $('note').textContent='Nothing was heard. Tap Score, wait half a second, say the sentence clearly, then tap Stop.'; return; }
+  if(!heard){ if(!$('note').classList.contains('warn')) $('note').textContent='Nothing was heard. Tap Repeat, wait half a second, say the sentence clearly, then tap Stop.'; return; }
   const overall = Math.round(100*sim(target,heard));
   // word-level diff for feedback
   const tw = target.split(' '), hw = heard.split(' ');
@@ -492,11 +487,11 @@ function scoreIt(){
   progress[i]=p; save('pappagallo-progress', progress);
   $('note').className='note'; $('note').textContent='';
   show();
+  if(isAndroid && !prefs.androidNoteShown){ prefs.androidNoteShown=true; save('pappagallo-prefs',prefs); $('note').textContent='On Android, Chrome cannot record while it scores, so there is no playback of your take here. Use Listen as the model and the struck-through words as the feedback.'; }
 }
 
 // ---------- wire up ----------
 $('listen').onclick = listen;
-$('rec').onclick = () => recording ? stopRec() : startRec(false);
 $('score-btn').onclick = () => listening ? stopScore() : startScore();
 $('playme').onclick = () => { if(!myUrl) return; const a=new Audio(myUrl); a.play().catch(()=>{}); };
 $('rate').value = prefs.rate; $('rateval').textContent = prefs.rate.toFixed(2)+'×';
@@ -508,7 +503,7 @@ document.addEventListener('keydown', e => {
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
   const k=e.key.toLowerCase();
   if(e.key==='ArrowRight'){$('next').click();} else if(e.key==='ArrowLeft'){$('prev').click();}
-  else if(k==='l'){listen();} else if(k==='r'){$('rec').click();} else if(k==='s'){$('score-btn').click();} else if(k==='m'){$('playme').click();} else if(k==='e'){$('toggle-en').click();}
+  else if(k==='l'){listen();} else if(k==='r'){$('score-btn').click();} else if(k==='m'){$('playme').click();} else if(k==='e'){$('toggle-en').click();}
 });
 // restore position
 const startIdx = order.indexOf(prefs.pos); if(startIdx>=0) pos=startIdx;
