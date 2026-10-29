@@ -394,7 +394,8 @@ async function startRec(){
         $('note').textContent='Speech recognition error: '+e.error;
       }
     };
-    recog.onend = () => { if(recording){ try{recog.start();}catch(e){} } else { scoreIt(); } };
+    const inst = recog;
+    recog.onend = () => { if(recog!==inst) return; /* an error already explained itself */ if(recording){ try{inst.start();}catch(e){} } else { scoreIt(); } };
     try{ recog.start(); }catch(e){}
   } else {
     $('note').textContent='Recording works, but this browser cannot transcribe Italian for scoring. Chrome or Safari can.';
@@ -446,7 +447,7 @@ function sim(a,b){ const d=lev(a,b); return 1 - d/Math.max(a.length,b.length,1);
 function scoreIt(){
   const target = norm(cur().it), heard = norm(lastTranscript);
   const i = order[pos];
-  if(!heard){ $('note').textContent='Nothing was transcribed. Try again a little louder, closer to the mic.'; return; }
+  if(!heard){ if(!$('note').classList.contains('warn')) $('note').textContent='Nothing was transcribed. Hold Record for a second before speaking, speak up, and stop a beat after you finish.'; return; }
   const overall = Math.round(100*sim(target,heard));
   // word-level diff for feedback
   const tw = target.split(' '), hw = heard.split(' ');
